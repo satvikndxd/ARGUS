@@ -8,6 +8,8 @@ from (scenario, seed).
 
 from __future__ import annotations
 
+import zlib
+
 from .engine import DecisionEngine
 from .graph import RiskGraph
 from .synth import World
@@ -17,18 +19,26 @@ SCENARIOS = {
         "name": "synthetic_identity_wave",
         "description": "Coordinated synthetic-identity cash-out ramp with a device-farm spike shock",
         "duration_days": 14, "shock_day": 5, "shock_type": "device_farm_spike", "multiplier": 3.2,
+        "evasion_rate": 0.14,
     },
     "card_testing_storm": {
         "name": "card_testing_storm",
         "description": "Low-value enumeration burst across stolen card ranges",
         "duration_days": 7, "shock_day": 3, "shock_type": "enumeration_burst", "multiplier": 4.0,
+        "evasion_rate": 0.06,
     },
     "mule_cashout_campaign": {
         "name": "mule_cashout_campaign",
         "description": "Layered mule-network cash-out through colluding merchants",
         "duration_days": 10, "shock_day": 6, "shock_type": "mule_activation", "multiplier": 2.5,
+        "evasion_rate": 0.18,
     },
 }
+
+
+def _stable_pct(key: str) -> int:
+    """Process-stable pseudo-random percentile in [0, 100) for exact replay."""
+    return zlib.crc32(key.encode()) % 100
 
 
 def run_scenario(scenario_id: str, seed: int = 1337) -> dict:
@@ -46,19 +56,41 @@ def run_scenario(scenario_id: str, seed: int = 1337) -> dict:
                  "false_pos": 0, "loss_prevented": 0.0, "loss_incurred": 0.0,
                  "shock": (d + 1 == spec["shock_day"])} for d in range(days)]
 
+    legit_pool = sorted(c.id for c in world.consumers.values() if c.kind == "legit")
+    evasion = spec.get("evasion_rate", 0.1)
+
     for txn in world.txns:
         day = min(days - 1, txn.step // steps_per_day)
         amount = txn.amount
         is_fraud = txn.is_fraud
+        consumer_id, device_id, geo = txn.consumer_id, txn.device_id, txn.geo
+        # adaptive adversary: a slice of attacks launder through compromised
+        # clean accounts with home geo and modest amounts (graph-invisible)
+        evaded = False
+        if is_fraud and _stable_pct(f"{txn.id}:ev:{seed}") < evasion * 100:
+            evaded = True
+            host = world.consumers[legit_pool[zlib.crc32(txn.id.encode()) % len(legit_pool)]]
+            consumer_id, device_id, geo = host.id, host.devices[0], host.geo
+            amount = min(amount, 180.0)
         # shock: amplify attack volume on shock day
         if timeline[day]["shock"] and is_fraud:
             amount *= spec["multiplier"] ** 0.5
         d = engine.evaluate({
-            "id": txn.id, "step": txn.step, "consumer_id": txn.consumer_id,
-            "merchant_id": txn.merchant_id, "device_id": txn.device_id,
-            "card_id": txn.card_id, "amount": amount, "geo": txn.geo,
+            "id": txn.id, "step": txn.step, "consumer_id": consumer_id,
+            "merchant_id": txn.merchant_id, "device_id": device_id,
+            "card_id": txn.card_id, "amount": amount, "geo": geo,
         })
-        blocked = d["decision"] in ("review", "decline", "step_up")
+        # step-up challenges are bypassable (session hijack / OTP interception):
+        # deterministic per-txn outcome so replays are exact.
+        if d["decision"] in ("review", "decline"):
+            blocked = True
+        elif d["decision"] == "step_up":
+            blocked = _stable_pct(f"{txn.id}:su:{seed}") < 72
+        elif d["decision"] == "monitor":
+            # monitored fraud is caught downstream ~40% of the time, pre-settlement
+            blocked = is_fraud and _stable_pct(f"{txn.id}:mon:{seed}") < 40
+        else:
+            blocked = False
         row = timeline[day]
         row["txns"] += 1
         if is_fraud:
