@@ -14,6 +14,8 @@ SHOTS = [
     ("cases", "▤ INVESTIGATIONS", 2.0),
     ("sim", "◬ SIMULATION", 1.0),
     ("console", "▚ DECISION CONSOLE", 1.5),
+    ("enterprise", "⬢ ENTERPRISE", 2.5),
+    ("fabric", "⬡ NETWORK FABRIC", 4.0),
 ]
 
 
@@ -34,6 +36,11 @@ async def main():
             if name == "console":
                 await page.click("#eval-form button[type=submit]")
                 await page.wait_for_timeout(1200)
+            if name == "enterprise":
+                await page.click("#ac-check")
+                await page.wait_for_timeout(400)
+                await page.click("#audit-tamper")
+                await page.wait_for_timeout(600)
             await page.screenshot(path=f"{OUT}/{name}.png")
             print(f"captured {name}")
         await browser.close()

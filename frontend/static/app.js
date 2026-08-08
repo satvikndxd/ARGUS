@@ -585,6 +585,230 @@ async function evaluateTxn(e) {
     : "No single-feature intervention flips this decision.";
 }
 
+/* ------------------------------------------------ enterprise */
+async function loadEnterprise() {
+  const [reg, rbac, audit, scim] = await Promise.all([
+    api("/api/enterprise/tenants"), api("/api/enterprise/rbac"),
+    api("/api/enterprise/audit?limit=9"), api("/scim/v2/Users"),
+  ]);
+  const t = reg.tenants;
+  $("#ent-tiles").innerHTML = [
+    { k: "TENANTS", v: t.length, s: "isolated world shards" },
+    { k: "REGIONS", v: reg.regions.length, s: reg.regions.map(r => r.jurisdiction).join(" · ") },
+    { k: "SCIM IDENTITIES", v: scim.totalResults, s: "SSO-provisioned via 3 IdPs" },
+    { k: "AUDIT EVENTS", v: audit.total, s: "hash-chained · append-only" },
+    { k: "CHAIN INTEGRITY", v: audit.verify.valid ? "VALID ✓" : "BROKEN", s: `head ${audit.verify.head || "—"}` },
+    { k: "SHREDDED", v: t.reduce((a, x) => a + x.shredded_entities, 0), s: "DSAR crypto-erasures", warn: true },
+  ].map(x => `<div class="tile ${x.warn ? "warn" : ""}"><div class="k">${x.k}</div><div class="v">${x.v}</div><div class="s">${x.s}</div></div>`).join("");
+
+  $("#tbl-tenants").innerHTML = `<tr><th>TENANT</th><th>KIND</th><th>PLAN</th><th>REGION</th><th>JURISDICTION</th><th class="num">TXNS</th><th class="num">FRAUD</th><th class="num">LAG</th></tr>` +
+    t.map(x => `<tr><td style="color:var(--g1)">${x.name}</td><td style="font-size:10px">${x.kind.replace(/_/g, " ")}</td>
+      <td><span class="badge approve">${x.plan}</span></td><td>${x.region}</td><td>${x.jurisdiction}</td>
+      <td class="num">${x.transactions}</td><td class="num">${(x.fraud_rate * 100).toFixed(1)}%</td>
+      <td class="num">${x.replication_lag_ms}ms</td></tr>`).join("");
+
+  if (!$("#ac-user").options.length) {
+    $("#ac-user").innerHTML = scim.Resources.map(u =>
+      `<option value="${u.api_key}">${u.userName} · ${u.role.toUpperCase()} · ${u.tenant_id}</option>`).join("");
+    $("#ac-perm").innerHTML = rbac.permissions.map(p => `<option>${p}</option>`).join("");
+  }
+
+  $("#tbl-rbac").innerHTML = `<tr><th>PERMISSION</th>${rbac.roles.map(r => `<th>${r.toUpperCase().slice(0, 5)}</th>`).join("")}</tr>` +
+    rbac.permissions.map(p => `<tr><td style="font-size:10px">${p}</td>` +
+      rbac.roles.map(r => `<td>${rbac.grants[r].includes(p)
+        ? '<span style="color:var(--g2)">✓</span>' : '<span style="color:var(--ink-muted)">·</span>'}</td>`).join("") + "</tr>").join("");
+
+  renderAudit(audit);
+  $("#tbl-scim").innerHTML = `<tr><th>USER</th><th>TENANT</th><th>ROLE</th><th>IDP</th><th>STATE</th></tr>` +
+    scim.Resources.map(u => `<tr><td>${u.userName}</td><td>${u.tenant_id}</td>
+      <td><span class="badge ${u.role === "admin" ? "review" : "approve"}">${u.role.toUpperCase()}</span></td>
+      <td>${u.idp}</td><td style="color:var(--g2)">ACTIVE</td></tr>`).join("");
+}
+
+function renderAudit(audit) {
+  const v = audit.verify;
+  $("#audit-status").innerHTML = v.valid
+    ? `⟨ CHAIN VALID ✓ · ${v.checked} LINKS · HEAD ${v.head} ⟩`
+    : `<span style="color:${CRIT}">⟨ ⚠ CHAIN BROKEN AT SEQ ${v.broken_at_seq} — FORGERY DETECTED ⟩</span>`;
+  $("#tbl-audit").innerHTML = `<tr><th>#</th><th>TENANT</th><th>ACTOR</th><th>ACTION</th><th>RESOURCE</th><th>HASH</th></tr>` +
+    audit.events.map(e => {
+      const forged = e.metadata && e.metadata.FORGED;
+      return `<tr ${forged ? `style="color:${CRIT}"` : ""}>
+      <td>${String(e.seq).padStart(3, "0")}</td><td>${e.tenant_id}</td><td>${e.actor}</td>
+      <td>${forged ? "⚠ " : ""}${e.action}</td><td style="font-size:10px">${e.resource}</td>
+      <td style="font-size:9px;color:${forged ? CRIT : MUTED}">${(e.hash || "").slice(0, 12)}…</td></tr>`;
+    }).join("");
+}
+
+async function checkAccess() {
+  const r = await api("/v1/auth/check", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: $("#ac-user").value, permission: $("#ac-perm").value,
+      attributes: $("#ac-xr").checked ? { cross_region: true, case_sensitivity: true } : {},
+    }),
+  });
+  $("#ac-result").innerHTML = r.allow
+    ? `<span style="color:${RAMP[0]}">▲ ALLOW</span>  ${r.identity.user} (${r.identity.role}) → ${$("#ac-perm").value}\nlayer: ${r.layer}`
+    : `<span style="color:${CRIT}">▼ DENY</span>   layer: ${r.layer || "AUTHN"}${r.rule ? " · rule " + r.rule : ""}\nreason: ${r.reason}`;
+}
+
+/* ------------------------------------------------ fabric */
+let fabricAnim = null;
+async function loadFabric() {
+  const [m, uplift, fl] = await Promise.all([
+    api("/api/fabric/map"), api("/api/fabric/uplift"),
+    api("/v1/fabric/fl:run?rounds=8&dp_epsilon=4.0", { method: "POST" }),
+  ]);
+  $("#fab-tiles").innerHTML = [
+    { k: "AVG RECALL UPLIFT", v: `+${uplift.avg_uplift_pp}pp`, s: "solo → federated, roaming fraud" },
+    { k: "NETWORKS JOINED", v: m.tenants.length, s: "issuer · processor · marketplace" },
+    { k: "CROSS-NETWORK HITS", v: m.cross_network_hits.length, s: "shared attack infrastructure", warn: true },
+    { k: "ROAMING RINGS", v: m.global_rings.length, s: "multi-institution campaigns", warn: true },
+    { k: "INDICATORS PUBLISHED", v: Object.values(m.indicator_stats).reduce((a, x) => a + x.published, 0), s: "salted-HMAC · bloom filters" },
+    { k: "DP EPSILON", v: fl.dp_epsilon.toFixed(1), s: `FedAvg · ${fl.rounds.length} rounds · ${fl.converged ? "converged ✓" : "training"}` },
+  ].map(x => `<div class="tile ${x.warn ? "warn" : ""}"><div class="k">${x.k}</div><div class="v">${x.v}</div><div class="s">${x.s}</div></div>`).join("");
+
+  hbars($("#fab-uplift"), uplift.per_tenant.flatMap(r => [
+    { label: `${r.name} — SOLO`, value_label: (r.recall_solo * 100).toFixed(1) + "%", pct: r.recall_solo,
+      tip: `${r.roaming_fraud_txns} roaming fraud txns` },
+    { label: `${r.name} — <b>FEDERATED</b>`, value_label: `${(r.recall_federated * 100).toFixed(1)}% (+${r.uplift_pp}pp)`,
+      pct: r.recall_federated, tip: `uplift +${r.uplift_pp}pp` },
+  ]), { bright: r => r.label.includes("FEDERATED") });
+
+  lineChart($("#chart-fl"), [
+    { name: "MODEL DIVERGENCE", data: fl.rounds.map(r => r.model_divergence), color: RAMP[0] },
+    { name: "DP NOISE σ", data: fl.rounds.map(r => r.dp_noise_sigma), color: RAMP[3], dash: [4, 4] },
+  ], { xlab: i => "R" + (i + 1), fmt: v => v.toFixed(2) });
+  $("#legend-fl").innerHTML = `
+    <span><i class="sw" style="background:${RAMP[0]}"></i>MODEL DIVERGENCE (converging ↓)</span>
+    <span><i class="sw" style="background:${RAMP[3]}"></i>DP NOISE σ (dashed, constant)</span>`;
+
+  $("#tbl-hits").innerHTML = `<tr><th>FINGERPRINT (HMAC)</th><th>KIND</th><th class="num">NETWORKS</th><th>SEEN BY</th><th>ARCHETYPES</th></tr>` +
+    m.cross_network_hits.map(h => `<tr>
+      <td style="font-family:monospace;color:${RAMP[1]}">${h.fingerprint}…</td><td>${h.kind}</td>
+      <td class="num">${h.networks.length}</td>
+      <td style="font-size:10px">${h.networks.map(n => n.replace("tn_", "")).join(" · ")}</td>
+      <td style="font-size:10px;color:${WARN}">${h.archetypes.join(", ")}</td></tr>`).join("");
+
+  $("#tbl-roam").innerHTML = `<tr><th>RING</th><th>ARCHETYPE</th><th class="num">DEVICES</th><th>CAMPAIGN PATH</th></tr>` +
+    m.global_rings.map(r => `<tr><td>${r.ring_id}</td>
+      <td style="color:${WARN}">${r.archetype.replace(/_/g, " ")}</td>
+      <td class="num">${r.devices}</td>
+      <td style="font-size:10px">${r.victims.map(v =>
+        v.includes("early_wave")
+          ? `<span style="color:${CRIT}">⚠ ${v.replace("tn_", "").replace(":early_wave", " (EARLY WAVE)")}</span>`
+          : v.replace("tn_", "")).join(" → ")}</td></tr>`).join("");
+
+  $("#fab-privacy").textContent =
+    `exchange        ${m.privacy.exchange}\n` +
+    `disclosure      ${m.privacy.disclosure}\n` +
+    `raw ids shared  ${m.privacy.raw_ids_shared}\n` +
+    `pii shared      ${m.privacy.pii_shared}\n\n` +
+    Object.entries(m.indicator_stats).map(([tid, s]) =>
+      `${tid.padEnd(12)} published ${String(s.published).padStart(3)} indicators · bloom fill ${(s.fill_ratio * 100).toFixed(1)}%`).join("\n");
+
+  drawFabricMap(m);
+}
+
+function drawFabricMap(m) {
+  const cv = $("#fabric-canvas");
+  const dpr = devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight || 380;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W / 2, cy = H / 2 + 8, R = Math.min(W, H) / 2.9;
+  const pos = m.tenants.map((t, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / m.tenants.length;
+    return { ...t, x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+  });
+  const hitsBetween = {};
+  m.cross_network_hits.forEach(h => {
+    for (let i = 0; i < h.networks.length; i++)
+      for (let j = i + 1; j < h.networks.length; j++) {
+        const k = [h.networks[i], h.networks[j]].sort().join("|");
+        hitsBetween[k] = (hitsBetween[k] || 0) + 1;
+      }
+  });
+  let t0 = 0;
+  if (fabricAnim) cancelAnimationFrame(fabricAnim);
+
+  function hex(x, y, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + i * Math.PI / 3;
+      const px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  function frame() {
+    t0 += 0.012;
+    ctx.clearRect(0, 0, W, H);
+    // spokes to core + inter-tenant links
+    pos.forEach(p => {
+      ctx.strokeStyle = "rgba(35,181,82,.35)"; ctx.lineWidth = 1;
+      ctx.setLineDash([4, 5]);
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(cx, cy); ctx.stroke();
+      ctx.setLineDash([]);
+      // indicator pulses travelling to the core
+      const ph = (t0 + p.x * 0.01) % 1;
+      const px = p.x + (cx - p.x) * ph, py = p.y + (cy - p.y) * ph;
+      ctx.fillStyle = RAMP[0]; ctx.shadowColor = RAMP[0]; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(px, py, 2.4, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    });
+    for (let i = 0; i < pos.length; i++)
+      for (let j = i + 1; j < pos.length; j++) {
+        const k = [pos[i].tenant_id, pos[j].tenant_id].sort().join("|");
+        const n = hitsBetween[k] || 0;
+        if (!n) continue;
+        ctx.strokeStyle = `rgba(255,200,87,${0.25 + Math.min(0.5, n * 0.1)})`;
+        ctx.lineWidth = 1 + Math.min(3, n * 0.5);
+        ctx.beginPath(); ctx.moveTo(pos[i].x, pos[i].y); ctx.lineTo(pos[j].x, pos[j].y); ctx.stroke();
+        const mx = (pos[i].x + pos[j].x) / 2, my = (pos[i].y + pos[j].y) / 2;
+        ctx.fillStyle = WARN; ctx.font = FONT;
+        ctx.fillText(`⚠ ${n} shared`, mx - 24, my - 6);
+      }
+    // core
+    ctx.save();
+    ctx.strokeStyle = RAMP[1]; ctx.shadowColor = RAMP[1]; ctx.shadowBlur = 16;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(cx, cy, 26 + Math.sin(t0 * 2) * 2, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 12, 0, 7);
+    ctx.fillStyle = RAMP[1]; ctx.fill(); ctx.restore();
+    ctx.fillStyle = INK; ctx.font = FONT;
+    ctx.fillText("ARGUS", cx - 18, cy + 44); ctx.fillText("FABRIC", cx - 21, cy + 56);
+    // tenants
+    pos.forEach(p => {
+      ctx.save();
+      ctx.strokeStyle = RAMP[0]; ctx.shadowColor = RAMP[0]; ctx.shadowBlur = 10;
+      ctx.lineWidth = 1.6; hex(p.x, p.y, 22); ctx.stroke();
+      ctx.fillStyle = "rgba(168,245,176,.08)"; ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = INK; ctx.font = FONT;
+      ctx.fillText(p.name, p.x - ctx.measureText(p.name).width / 2, p.y - 30);
+      ctx.fillStyle = MUTED;
+      ctx.fillText(p.region, p.x - ctx.measureText(p.region).width / 2, p.y + 40);
+      ctx.fillStyle = INK2;
+      const kind = p.kind.replace(/_/g, " ");
+      ctx.fillText(kind, p.x - ctx.measureText(kind).width / 2, p.y + 4);
+    });
+    if ($("#view-fabric").classList.contains("active"))
+      fabricAnim = requestAnimationFrame(frame);
+  }
+  frame();
+  cv.onmousemove = e => {
+    const r = cv.getBoundingClientRect();
+    const p = pos.find(p => Math.hypot(p.x - (e.clientX - r.left), p.y - (e.clientY - r.top)) < 28);
+    if (p) showTip(`<b>${p.name}</b> · ${p.plan}<br>${p.region} (${p.jurisdiction})<br>` +
+      `${p.transactions} txns · fraud ${(p.fraud_rate * 100).toFixed(1)}%<br>` +
+      `replication lag ${p.replication_lag_ms}ms`, e.clientX, e.clientY);
+    else hideTip();
+  };
+}
+
 /* ------------------------------------------------ shell */
 document.querySelectorAll("#nav button").forEach(b => {
   b.onclick = () => {
@@ -592,9 +816,13 @@ document.querySelectorAll("#nav button").forEach(b => {
     document.querySelectorAll(".view").forEach(x => x.classList.remove("active"));
     b.classList.add("active");
     $("#view-" + b.dataset.view).classList.add("active");
-    ({ overview: loadOverview, graph: loadGraphView, cases: loadCases, sim: loadSim, console: loadConsole })[b.dataset.view]();
+    ({ overview: loadOverview, graph: loadGraphView, cases: loadCases, sim: loadSim,
+       console: loadConsole, enterprise: loadEnterprise, fabric: loadFabric })[b.dataset.view]();
   };
 });
+$("#ac-check").onclick = checkAccess;
+$("#audit-verify").onclick = async () => renderAudit(await api("/api/enterprise/audit?limit=9"));
+$("#audit-tamper").onclick = async () => renderAudit(await api("/api/enterprise/audit?limit=9&tamper=1"));
 $("#graph-load").onclick = () => renderGraph($("#graph-entity").value);
 $("#graph-entity").onchange = () => renderGraph($("#graph-entity").value);
 $("#sim-run").onclick = runSim;

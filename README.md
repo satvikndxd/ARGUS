@@ -19,11 +19,13 @@ engine, a 15-agent investigation crew, and a deterministic attack simulator, wra
 monochrome phosphor console straight out of the Matrix.
 
 [![status](https://img.shields.io/badge/status-OPERATIONAL-58e07a?style=flat-square&labelColor=04120a)](docs/metrics/metrics.json)
-[![version](https://img.shields.io/badge/version-0.1.0_"PANOPTES"-58e07a?style=flat-square&labelColor=04120a)](#)
-[![tests](https://img.shields.io/badge/tests-22%2F22_passing-58e07a?style=flat-square&labelColor=04120a)](tests/)
+[![version](https://img.shields.io/badge/version-0.2.0_"MERIDIAN"-58e07a?style=flat-square&labelColor=04120a)](CHANGELOG.md)
+[![tests](https://img.shields.io/badge/tests-34%2F34_passing-58e07a?style=flat-square&labelColor=04120a)](tests/)
 [![AUC-ROC](https://img.shields.io/badge/AUC--ROC-0.998-a8f5b0?style=flat-square&labelColor=04120a)](#-benchmark-report-card)
 [![ring precision](https://img.shields.io/badge/ring_precision-1.00-a8f5b0?style=flat-square&labelColor=04120a)](#-benchmark-report-card)
 [![p99 latency](https://img.shields.io/badge/p99_decision-0.098ms-a8f5b0?style=flat-square&labelColor=04120a)](#-benchmark-report-card)
+[![federation uplift](https://img.shields.io/badge/federation_uplift-%2B25.6pp_recall-ffc857?style=flat-square&labelColor=04120a)](#-phase-6--the-network-fabric)
+[![privacy](https://img.shields.io/badge/cross--network_PII-ZERO-ffc857?style=flat-square&labelColor=04120a)](#-phase-6--the-network-fabric)
 [![deterministic](https://img.shields.io/badge/replay-bit--exact-23b552?style=flat-square&labelColor=04120a)](#-deterministic-by-construction)
 [![license](https://img.shields.io/badge/license-MIT-23b552?style=flat-square&labelColor=04120a)](LICENSE)
 
@@ -81,6 +83,21 @@ policy hits, per-model attributions, and counterfactuals
 (*"if this device were not shared, risk drops 0.79 → 0.67"*).
 
 ![ARGUS Decision Console](docs/screenshots/console.png)
+
+### ⬢ Enterprise — Phase 5, live
+Three institutions on three continents, each an isolated world shard. RBAC×ABAC access
+checks you can run from the console, a SHA-256 hash-chained audit ledger with a one-click
+**forgery-injection demo** (`⚠ CHAIN BROKEN AT SEQ 2 — FORGERY DETECTED`), SCIM directory,
+and DSAR crypto-shredding.
+
+![ARGUS Enterprise](docs/screenshots/enterprise.png)
+
+### ⬡ Network Fabric — Phase 6, live
+The global risk fabric: hex institutions around the ARGUS core, amber links weighted by
+**shared attack infrastructure**, animated pulses carrying salted-HMAC indicators (never
+raw IDs). Right panel: per-tenant federation uplift and the FedAvg+DP convergence curve.
+
+![ARGUS Network Fabric](docs/screenshots/fabric.png)
 
 ---
 
@@ -150,6 +167,90 @@ synthetic world (`seed=1337`: 487 consumers, 60 merchants, 605 devices, **7 frau
 
 12 cases auto-opened on the highest-risk decisions → **11 confirmed_fraud, 1 cleared**,
 15 agents dispatched per case, every trace step tool-tagged and audit-sealed.
+
+---
+
+## ⬢ Phase 5 — The Enterprise Plane
+
+Multi-institution deployment, built and tested — not a roadmap bullet.
+
+| Capability | Implementation |
+|---|---|
+| **Multi-tenancy** | 3 institutions (issuer bank / processor / marketplace), each a fully **namespaced world shard** — isolation by construction, no shared identifiers, tested |
+| **Data residency** | tenants pinned to `us-east-1` (US) · `eu-central-1` (EU/GDPR) · `ap-southeast-1` (SG/MAS) with per-region replication lag |
+| **RBAC** | 5 roles × 9 permissions (`admin` → full, `viewer` → `cases.read` only) |
+| **ABAC overlay** | attribute rules on top: cross-region graph reads, home-region-only erasure, sensitivity-gated cases |
+| **SSO / SCIM** | 10 identities provisioned across Okta / Azure AD / Google, SCIM 2.0 list schema |
+| **Immutable audit** | SHA-256 **hash chain** — every event commits to its predecessor; one forged byte breaks every later link (tamper demo in the console) |
+| **GDPR erasure** | **crypto-shredding**: destroy the per-entity DEK, ciphertext becomes irrecoverable, erasure itself is audit-chained |
+
+```text
+THE TENANTS                       REGION           JURISDICTION   PLAN
+──────────────────────────────────────────────────────────────────────────
+⬢ HELION BANK      issuer bank    us-east-1        US             SOVEREIGN
+⬢ VULCAN PAY       processor      eu-central-1     EU / GDPR      ENTERPRISE
+⬢ NIMBUS MARKET    marketplace    ap-southeast-1   SG / MAS       GROWTH
+```
+
+---
+
+## ⬡ Phase 6 — The Network Fabric
+
+The endgame from the spec: **cross-network intelligence without sharing data.**
+Three institutions that legally cannot show each other their graphs — and a fraud ring
+that attacks all three with the same device farms.
+
+```mermaid
+flowchart LR
+    subgraph HELION["⬢ HELION BANK (us-east-1)"]
+      HW[world shard] --> HB[bloom filter<br/>salted-HMAC indicators]
+    end
+    subgraph VULCAN["⬢ VULCAN PAY (eu-central-1)"]
+      VW[world shard] --> VB[bloom filter]
+    end
+    subgraph NIMBUS["⬢ NIMBUS MARKET (ap-southeast-1)"]
+      NW[world shard] --> NB[bloom filter]
+    end
+    subgraph CORE["◉ ARGUS FABRIC CORE"]
+      PROBE[membership probe<br/>hit / no-hit + archetype ONLY]
+      FED[FedAvg aggregator<br/>+ DP noise ε=4.0]
+    end
+    HB & VB & NB --> PROBE
+    HW & VW & NW -->|weight deltas only| FED
+    RING(("⚠ groam_01<br/>roaming ring")) -.attacks.-> HW & VW & NW
+    PROBE -->|"+25.6pp recall"| DEC[federated decisions]
+```
+
+**The privacy contract** — the only things that ever cross a tenant boundary:
+
+| Crosses the boundary | Never crosses |
+|---|---|
+| salted-HMAC fingerprints (Bloom filter bits) | raw device / card / account IDs |
+| membership hit/no-hit + archetype class | entities, graphs, transactions |
+| FedAvg weight deltas (+ DP noise, ε=4.0) | training data, labels, PII |
+
+**The headline experiment** — roaming rings hit their *next* institution through fresh
+sleeper accounts the local graph has never seen. Solo, each tenant misses the early wave.
+Federated, the shared fingerprint lights up:
+
+| Institution | Roaming fraud | Recall SOLO | Recall FEDERATED | Uplift |
+|---|---:|---:|---:|---:|
+| HELION BANK | 97 txns | 71.1% | **100%** | **+28.9pp** |
+| VULCAN PAY | 92 txns | 72.8% | **100%** | **+27.2pp** |
+| NIMBUS MARKET | 92 txns | 79.3% | **100%** | **+20.7pp** |
+| **NETWORK AVERAGE** | | | | **+25.6pp** |
+
+Campaign paths (each ring's last victim is its early-wave target):
+
+```text
+groam_00  mule_cashout        helion → vulcan → ⚠ nimbus (EARLY WAVE)
+groam_01  synthetic_identity  vulcan → nimbus → ⚠ helion (EARLY WAVE)
+groam_02  account_takeover    nimbus → helion → ⚠ vulcan (EARLY WAVE)
+```
+
+Federated learning: 8 FedAvg rounds with seeded Gaussian DP noise, deterministic
+convergence (divergence 0.68 → 0.32), audit-chained. Bloom probes have **zero false
+negatives** by construction (tested) and disclose nothing an adversary can reverse.
 
 ---
 
@@ -359,6 +460,14 @@ console.log(d.risk_score, d.decision);
 | POST | `/v1/simulations/{name}:run?seed=…` | run a deterministic attack campaign |
 | GET | `/api/metrics` | full benchmark report card |
 | GET | `/api/overview` · `/api/feed` · `/api/policies` · `/api/agents` | console data plane |
+| POST | `/v1/auth/check` | live RBAC+ABAC access decision *(P5)* |
+| GET | `/scim/v2/Users` | SCIM 2.0 directory *(P5)* |
+| GET | `/api/enterprise/audit?tamper=1` | hash-chain verify + forgery demo *(P5)* |
+| POST | `/v1/privacy/erase` | DSAR crypto-shredding *(P5)* |
+| POST | `/v1/fabric/probe` | private cross-network membership probe *(P6)* |
+| POST | `/v1/fabric/evaluate` | federated decision with network intel *(P6)* |
+| GET | `/api/fabric/uplift` | measured solo-vs-federated recall *(P6)* |
+| POST | `/v1/fabric/fl:run` | FedAvg + DP training rounds *(P6)* |
 
 ---
 
@@ -409,13 +518,15 @@ argus/
 │       ├── engine.py          # 3-model ensemble, policy stack, counterfactuals
 │       ├── agents.py          # 15-agent orchestrator with tool-tagged traces
 │       ├── simulation.py      # attack campaigns, shock injection, exact replay
+│       ├── tenancy.py         # P5: tenants, RBAC/ABAC, SCIM, audit chain, crypto-shred
+│       ├── federation.py      # P6: bloom indicators, roaming rings, FedAvg+DP, uplift
 │       └── evaluate.py        # offline report card → docs/metrics/metrics.json
 ├── frontend/                  # Matrix console (vanilla JS + hand-rolled canvas charts)
 ├── simulation/scenarios/      # scenario DSL (YAML)
 ├── sdk/python/ · sdk/typescript/
 ├── infra/docker/              # Dockerfile, compose, screenshot harness
 ├── docs/screenshots/ · docs/metrics/
-└── tests/                     # 22 tests: determinism, policies, graph, API contracts
+└── tests/                     # 34 tests: determinism, policies, graph, API, RBAC, federation
 ```
 
 ---
@@ -437,12 +548,14 @@ The reference implementation keeps identical interfaces to the production drop-i
 
 ## ◬ Roadmap
 
-- [x] **Phase 0–1** — decision API, entity graph, policy engine, case queue *(this repo)*
-- [x] **Phase 2** — community detection, ring discovery, graph explorer *(this repo)*
-- [x] **Phase 3** — 15-agent investigation suite with reasoning traces *(this repo)*
-- [x] **Phase 4** — simulation platform with shock injection + exact replay *(this repo)*
-- [ ] **Phase 5** — multi-tenant enterprise plane (SSO/SCIM, RBAC/ABAC, residency)
-- [ ] **Phase 6** — cross-network privacy-preserving shared risk graph
+- [x] **Phase 0–1** — decision API, entity graph, policy engine, case queue
+- [x] **Phase 2** — community detection, ring discovery, graph explorer
+- [x] **Phase 3** — 15-agent investigation suite with reasoning traces
+- [x] **Phase 4** — simulation platform with shock injection + exact replay
+- [x] **Phase 5** — multi-tenant enterprise plane: RBAC/ABAC, SCIM, hash-chained audit, residency, crypto-shredding ⬢
+- [x] **Phase 6** — privacy-preserving cross-network risk fabric: bloom indicators, roaming-ring detection, federated learning ⬡
+
+**All six phases of the platform specification are implemented and running.**
 
 ---
 

@@ -23,9 +23,11 @@ from argus import __version__  # noqa: E402
 from argus.agents import AGENT_ROSTER, InvestigationOrchestrator  # noqa: E402
 from argus.engine import POLICY_STACK, DecisionEngine  # noqa: E402
 from argus.evaluate import evaluate as run_evaluation  # noqa: E402
+from argus.federation import RiskFabric  # noqa: E402
 from argus.graph import RiskGraph  # noqa: E402
 from argus.simulation import SCENARIOS, run_scenario  # noqa: E402
 from argus.synth import World  # noqa: E402
+from argus.tenancy import EnterprisePlane  # noqa: E402
 
 app = FastAPI(title="ARGUS", version=__version__,
               description="AI-Native Payment Risk Intelligence Platform")
@@ -64,6 +66,12 @@ for _d in _ranked:
         orchestrator.investigate(_d)
     if len(orchestrator.cases) >= 14:
         break
+
+# ------------------------------------------- Phase 5/6: enterprise + fabric
+enterprise = EnterprisePlane()
+fabric = RiskFabric(enterprise)
+_uplift_cache: dict | None = None
+_fl_cache: dict | None = None
 
 _metrics_cache: dict | None = None
 
@@ -232,6 +240,92 @@ def simulate(scenario_id: str, seed: int = 1337):
 @app.get("/api/metrics")
 def metrics_endpoint():
     return metrics()
+
+
+# ==================================================== Phase 5: enterprise
+@app.get("/api/enterprise/tenants")
+def enterprise_tenants():
+    return {"tenants": enterprise.summaries(),
+            "regions": [{"region": k, **v} for k, v in
+                        __import__("argus.tenancy", fromlist=["REGIONS"]).REGIONS.items()]}
+
+
+@app.get("/api/enterprise/rbac")
+def enterprise_rbac():
+    return enterprise.rbac_matrix()
+
+
+@app.post("/v1/auth/check")
+def auth_check(body: dict):
+    return enterprise.check_access(body.get("api_key", ""),
+                                   body.get("permission", ""),
+                                   body.get("attributes"))
+
+
+@app.get("/scim/v2/Users")
+def scim_users(tenant_id: str | None = None):
+    users = [u for u in enterprise.scim_users
+             if tenant_id is None or u["tenant_id"] == tenant_id]
+    return {"schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+            "totalResults": len(users), "Resources": users}
+
+
+@app.get("/api/enterprise/audit")
+def enterprise_audit(limit: int = 30, tamper: bool = False):
+    events = enterprise.audit.events[-limit:]
+    if tamper:  # tamper-detection demo: mutate a copy, never the ledger
+        events = [dict(e) for e in enterprise.audit.events]
+        if len(events) > 3:
+            events[2] = dict(events[2], action="access.allow",
+                             metadata={"role": "viewer", "FORGED": True})
+        verdict = enterprise.audit.verify(events)
+        return {"events": events[-limit:], "verify": verdict, "tampered": True}
+    return {"events": events, "verify": enterprise.audit.verify(),
+            "total": len(enterprise.audit.events)}
+
+
+@app.post("/v1/privacy/erase")
+def privacy_erase(body: dict):
+    return enterprise.erase(body.get("tenant_id", ""), body.get("entity_id", ""),
+                            body.get("actor", "dpo"))
+
+
+# ==================================================== Phase 6: risk fabric
+@app.get("/api/fabric/map")
+def fabric_map():
+    return fabric.map()
+
+
+@app.post("/v1/fabric/probe")
+def fabric_probe(body: dict):
+    return fabric.probe(body.get("tenant_id", ""), body.get("kind", "device"),
+                        body.get("raw_id", ""))
+
+
+@app.post("/v1/fabric/evaluate")
+def fabric_evaluate(body: dict):
+    tid = body.pop("tenant_id", "tn_helion")
+    if tid not in fabric.plane.tenants:
+        raise HTTPException(404, "unknown tenant")
+    body.setdefault("id", f"txn_fab_{len(fabric.plane.tenants[tid].engine.decisions)}")
+    body.setdefault("step", 999999)
+    body.setdefault("card_id", "card_adhoc")
+    return fabric.evaluate_with_intel(tid, body)
+
+
+@app.get("/api/fabric/uplift")
+def fabric_uplift():
+    global _uplift_cache
+    if _uplift_cache is None:
+        _uplift_cache = fabric.uplift()
+    return _uplift_cache
+
+
+@app.post("/v1/fabric/fl:run")
+def fabric_fl(rounds: int = 8, dp_epsilon: float = 4.0):
+    global _fl_cache
+    _fl_cache = fabric.run_fl_rounds(rounds=rounds, dp_epsilon=dp_epsilon)
+    return _fl_cache
 
 
 # ------------------------------------------------------------------ frontend
