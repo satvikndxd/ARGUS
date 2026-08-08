@@ -1,0 +1,17 @@
+# ARGUS scenario DSL — synthetic identity cash-out wave
+scenario: synthetic_identity_wave
+description: Coordinated synthetic-identity cash-out ramp with a device-farm spike shock
+duration_days: 14
+seed: 1337
+population:
+  new_identities: 5000
+  synthetic_ratio: 0.18
+attack:
+  type: coordinated_cash_out
+  mule_network_size: 250
+  device_reuse_rate: 0.65
+  evasion_rate: 0.14        # slice of attacks laundered through clean accounts
+shock:
+  day: 5
+  type: device_farm_spike
+  multiplier: 3.2

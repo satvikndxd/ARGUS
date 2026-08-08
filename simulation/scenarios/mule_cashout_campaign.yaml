@@ -1,0 +1,14 @@
+# ARGUS scenario DSL — layered mule cash-out campaign
+scenario: mule_cashout_campaign
+description: Layered mule-network cash-out through colluding merchants
+duration_days: 10
+seed: 1337
+attack:
+  type: layered_cashout
+  mule_layers: 3
+  colluding_merchants: true
+  evasion_rate: 0.18
+shock:
+  day: 6
+  type: mule_activation
+  multiplier: 2.5

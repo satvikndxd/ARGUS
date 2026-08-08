@@ -1,0 +1,21 @@
+# ARGUS local stack.
+# The reference implementation is zero-dependency (in-process graph/vector/stream
+# engines); the commented services show the production topology drop-ins.
+services:
+  argus:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    ports:
+      - "8000:8000"
+
+  # postgres:        # tenant metadata, cases, policies, audit
+  #   image: postgres:16
+  # neo4j:           # production risk graph
+  #   image: neo4j:5
+  # qdrant:          # vector intelligence layer
+  #   image: qdrant/qdrant
+  # redis:           # hot feature / subgraph cache
+  #   image: redis:7
+  # redpanda:        # event spine (Kafka API)
+  #   image: redpandadata/redpanda
