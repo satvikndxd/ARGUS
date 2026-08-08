@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARGUS // RISK INTELLIGENCE CONSOLE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%2358e07a'>◉</text></svg>">
+</head>
+<body data-palette="#a8f5b0,#58e07a,#23b552">
+<canvas id="rain"></canvas>
+<div class="crt"></div>
+
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <span class="eye">◉</span>
+      <h1>ARGUS<span class="cursor">_</span></h1>
+      <span class="tag">AI-NATIVE PAYMENT RISK INTELLIGENCE // v0.1.0 "PANOPTES"</span>
+    </div>
+    <div class="sysstat" id="sysstat">
+      <span class="dot"></span> BOOTING<span class="blink">…</span>
+    </div>
+  </header>
+
+  <nav class="nav" id="nav">
+    <button data-view="overview" class="active">⌂ OVERVIEW</button>
+    <button data-view="graph">◈ RISK GRAPH</button>
+    <button data-view="cases">▤ INVESTIGATIONS</button>
+    <button data-view="sim">◬ SIMULATION</button>
+    <button data-view="console">▚ DECISION CONSOLE</button>
+  </nav>
+
+  <main id="main">
+    <!-- ============================ OVERVIEW ============================ -->
+    <section id="view-overview" class="view active">
+      <div class="tiles" id="kpi-tiles"></div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>TRANSACTION VOLUME vs LOSS PREVENTED</h2><span class="unit">USD / DAY (14-DAY WINDOW)</span></div>
+          <div class="chart-wrap"><canvas id="chart-daily" height="230"></canvas></div>
+          <div class="legend" id="legend-daily"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>RISK SCORE DISTRIBUTION</h2><span class="unit">DECISIONS BY GROUND TRUTH</span></div>
+          <div class="chart-wrap"><canvas id="chart-hist" height="230"></canvas></div>
+          <div class="legend" id="legend-hist"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>DETECTION BY FRAUD ARCHETYPE</h2><span class="unit">CAUGHT / ATTEMPTED</span></div>
+          <div id="chart-arch"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>ACTION MIX</h2><span class="unit">DECISION ENGINE OUTPUT</span></div>
+          <div id="chart-actions"></div>
+          <div class="panel-head" style="margin-top:14px"><h2>HIGH-RISK COMMUNITIES</h2><span class="unit">GRAPH LAYER</span></div>
+          <table class="tbl" id="tbl-communities"></table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>LIVE DECISION FEED</h2><span class="unit">MOST RECENT EVALUATIONS</span></div>
+        <table class="tbl feed" id="tbl-feed"></table>
+      </div>
+    </section>
+
+    <!-- ============================ GRAPH ============================ -->
+    <section id="view-graph" class="view">
+      <div class="toolbar">
+        <label>FOCUS ENTITY</label>
+        <select id="graph-entity"></select>
+        <label>DEPTH</label>
+        <select id="graph-depth"><option>1</option><option>2</option><option selected>3</option></select>
+        <button class="btn" id="graph-load">▶ EXPAND SUBGRAPH</button>
+        <span class="hint" id="graph-stats"></span>
+      </div>
+      <div class="grid-graph">
+        <div class="panel graph-panel">
+          <canvas id="graph-canvas"></canvas>
+          <div class="legend graph-legend">
+            <span><i class="sw" style="background:var(--g1)"></i>◉ CONSUMER</span>
+            <span><i class="sw" style="background:var(--g2)"></i>▣ DEVICE</span>
+            <span><i class="sw" style="background:var(--g3)"></i>◆ MERCHANT</span>
+            <span class="crit">⚠ RING / HIGH RISK = bright halo</span>
+          </div>
+        </div>
+        <div class="panel" id="graph-detail">
+          <div class="panel-head"><h2>NODE DOSSIER</h2><span class="unit">CLICK A NODE</span></div>
+          <div id="graph-node-info" class="mono-block">— awaiting selection —</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ CASES ============================ -->
+    <section id="view-cases" class="view">
+      <div class="grid-cases">
+        <div class="panel">
+          <div class="panel-head"><h2>CASE QUEUE</h2><span class="unit" id="case-count"></span></div>
+          <table class="tbl" id="tbl-cases"></table>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>AGENT REASONING TRACE</h2><span class="unit" id="case-title">SELECT A CASE</span></div>
+          <div id="case-verdict"></div>
+          <div id="case-trace"></div>
+          <div class="panel-head" style="margin-top:16px"><h2>INVESTIGATION REPORT</h2><span class="unit">AUDIT-SEALED</span></div>
+          <pre id="case-report" class="mono-block">—</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SIMULATION ============================ -->
+    <section id="view-sim" class="view">
+      <div class="toolbar">
+        <label>SCENARIO</label>
+        <select id="sim-scenario"></select>
+        <label>SEED</label>
+        <input id="sim-seed" value="1337" size="6">
+        <button class="btn" id="sim-run">▶ EXECUTE CAMPAIGN</button>
+        <span class="hint" id="sim-status"></span>
+      </div>
+      <div class="tiles" id="sim-tiles"></div>
+      <div class="panel">
+        <div class="panel-head"><h2>ATTACK CAMPAIGN TIMELINE</h2><span class="unit" id="sim-desc"></span></div>
+        <div class="chart-wrap"><canvas id="chart-sim" height="240"></canvas></div>
+        <div class="legend" id="legend-sim"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>DAILY BREAKDOWN</h2><span class="unit">DETERMINISTIC REPLAY</span></div>
+        <table class="tbl" id="tbl-sim"></table>
+      </div>
+    </section>
+
+    <!-- ============================ CONSOLE ============================ -->
+    <section id="view-console" class="view">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>EVALUATE TRANSACTION</h2><span class="unit">POST /v1/transactions:evaluate</span></div>
+          <form id="eval-form" class="eval-form">
+            <label>CONSUMER ENTITY</label><select id="ev-consumer"></select>
+            <label>MERCHANT</label><select id="ev-merchant"></select>
+            <label>DEVICE</label><select id="ev-device"></select>
+            <label>AMOUNT (USD)</label><input id="ev-amount" value="742.50">
+            <label>GEO</label>
+            <select id="ev-geo"><option>US</option><option>GB</option><option>NG</option><option>BR</option><option>SG</option></select>
+            <button class="btn big" type="submit">▶ SCORE TRANSACTION</button>
+          </form>
+          <div class="panel-head" style="margin-top:14px"><h2>ACTIVE POLICY STACK</h2><span class="unit">VERSIONED</span></div>
+          <table class="tbl" id="tbl-policies"></table>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>DECISION</h2><span class="unit" id="ev-latency"></span></div>
+          <div class="decision-row">
+            <div class="gauge-wrap"><canvas id="gauge" width="190" height="120"></canvas><div id="gauge-label"></div></div>
+            <div id="ev-action" class="action-badge">—</div>
+          </div>
+          <div id="ev-explanation" class="mono-block">Submit a transaction to see the evidence-linked decision.</div>
+          <div id="ev-reasons"></div>
+          <div class="panel-head" style="margin-top:12px"><h2>MODEL ENSEMBLE</h2><span class="unit">ATTRIBUTED</span></div>
+          <div id="ev-models"></div>
+          <div class="panel-head" style="margin-top:12px"><h2>COUNTERFACTUALS</h2><span class="unit">WHAT-IF</span></div>
+          <div id="ev-cf" class="mono-block">—</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusline" id="statusline">
+    <span>ARGUS://PANOPTES</span><span id="sl-mid">EVERY DECISION EXPLAINED. EVERY ENTITY REMEMBERED.</span><span id="sl-clock"></span>
+  </footer>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

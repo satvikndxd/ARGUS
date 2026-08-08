@@ -1,0 +1,148 @@
+{
+  "version": "0.1.0",
+  "seed": 1337,
+  "dataset": {
+    "seed": 1337,
+    "consumers": 487,
+    "merchants": 60,
+    "devices": 605,
+    "rings": 7,
+    "transactions": 6000,
+    "fraud_txns": 946,
+    "fraud_rate": 0.1577,
+    "fraud_volume_usd": 498889.38,
+    "total_volume_usd": 844260.74,
+    "archetypes": {
+      "card_testing": 232,
+      "account_takeover": 208,
+      "synthetic_identity": 68,
+      "refund_fraud": 147,
+      "merchant_collusion": 131,
+      "mule_cashout": 160
+    }
+  },
+  "scores": {
+    "auc_roc": 0.9979,
+    "pr_auc": 0.9882,
+    "recall_at_1pct_fpr": 0.9366,
+    "recall_at_5pct_fpr": 1.0,
+    "calibration_ece": 0.2412,
+    "precision_at_action": 0.6345,
+    "recall_at_action": 1.0,
+    "f1_at_action": 0.7764,
+    "false_positive_rate": 0.1078
+  },
+  "confusion_matrix": {
+    "tp": 946,
+    "fp": 545,
+    "tn": 4509,
+    "fn": 0
+  },
+  "action_mix": {
+    "approve": 3698,
+    "review": 1489,
+    "monitor": 808,
+    "step_up": 3,
+    "decline": 2
+  },
+  "per_archetype_detection": {
+    "card_testing": {
+      "attempts": 232,
+      "caught": 232,
+      "rate": 1.0
+    },
+    "account_takeover": {
+      "attempts": 208,
+      "caught": 208,
+      "rate": 1.0
+    },
+    "synthetic_identity": {
+      "attempts": 68,
+      "caught": 68,
+      "rate": 1.0
+    },
+    "refund_fraud": {
+      "attempts": 147,
+      "caught": 147,
+      "rate": 1.0
+    },
+    "merchant_collusion": {
+      "attempts": 131,
+      "caught": 131,
+      "rate": 1.0
+    },
+    "mule_cashout": {
+      "attempts": 160,
+      "caught": 160,
+      "rate": 1.0
+    }
+  },
+  "ring_detection": {
+    "ring_members": 67,
+    "entities_flagged": 41,
+    "precision": 1.0,
+    "recall": 0.6119,
+    "f1": 0.7593
+  },
+  "latency_ms": {
+    "p50": 0.05,
+    "p90": 0.066,
+    "p99": 0.098,
+    "mean": 0.049
+  },
+  "investigations": {
+    "cases_run": 12,
+    "verdicts": {
+      "confirmed_fraud": 11,
+      "cleared": 1
+    },
+    "avg_agents_per_case": 15
+  },
+  "risk_histogram": {
+    "bins": 20,
+    "legit": [
+      0,
+      0,
+      430,
+      702,
+      1078,
+      1574,
+      684,
+      217,
+      71,
+      129,
+      108,
+      45,
+      12,
+      0,
+      2,
+      2,
+      0,
+      0,
+      0,
+      0
+    ],
+    "fraud": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4,
+      49,
+      108,
+      96,
+      114,
+      113,
+      261,
+      199,
+      2,
+      0,
+      0
+    ]
+  }
+}

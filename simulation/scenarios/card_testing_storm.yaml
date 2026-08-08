@@ -1,0 +1,13 @@
+# ARGUS scenario DSL — card testing enumeration storm
+scenario: card_testing_storm
+description: Low-value enumeration burst across stolen card ranges
+duration_days: 7
+seed: 1337
+attack:
+  type: enumeration
+  amount_band: [0.5, 4.0]
+  evasion_rate: 0.06
+shock:
+  day: 3
+  type: enumeration_burst
+  multiplier: 4.0
